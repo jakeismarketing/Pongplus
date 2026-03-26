@@ -240,6 +240,7 @@ function update() {
   // ── Bullets ──────────────────────────────────────────────────────────────────
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
+    const prevY = b.y;
     b.y += b.vy;
     // Off screen
     if (b.y < -20 || b.y > COURT_H + 20) { bullets.splice(i, 1); continue; }
@@ -250,12 +251,20 @@ function update() {
     const dy = b.y - target.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Shield collision
-    if (dist <= SHIELD_R + BULLET_R && dist >= SHIELD_R - BULLET_R - 2) {
-      const angle = Math.atan2(dy, dx);
+    // Swept shield collision — check if bullet crossed the shield radius
+    const prevDy = prevY - target.y;
+    const prevDist = Math.sqrt(dx * dx + prevDy * prevDy);
+    const crossedShield = (prevDist >= SHIELD_R && dist <= SHIELD_R) ||
+                          (prevDist <= SHIELD_R && dist >= SHIELD_R) ||
+                          (dist <= SHIELD_R + BULLET_R && dist >= SHIELD_R - BULLET_R - 2);
+
+    if (crossedShield) {
+      // Find the y where bullet crosses shield radius for accurate angle
+      const hitY = (prevDist >= SHIELD_R) ? target.y + Math.sign(dy) * Math.sqrt(SHIELD_R * SHIELD_R - dx * dx) : b.y;
+      const hitDy = (isNaN(hitY) ? dy : hitY - target.y);
+      const angle = Math.atan2(hitDy, dx);
       const normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
       if (shieldBlocksAngle(target, normAngle)) {
-        // punch hole
         const holeHalf = Math.atan2(BULLET_R * 2, SHIELD_R);
         punchShieldHole(target, normAngle, holeHalf);
         bullets.splice(i, 1);
