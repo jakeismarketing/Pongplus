@@ -39,14 +39,14 @@ const COURT_H = 700;
 const PADDLE_W = 60;
 const PADDLE_H = 10;
 const BALL_R = 7.5;
-const SHIELD_R = 50;          // semicircle radius around paddle centre
-const BULLET_R = 2;           // bullet half-width (creates 4px holes)
-const BULLET_SPEED = 8;       // game-units per frame
+const SHIELD_R = 50;
+const BULLET_R = 2;
+const BULLET_SPEED = 8;
 const WIN_SCORE = 11;
 const AI_SPEED = 3.2;
 const BALL_START_SPEED = 3.5;
 const BALL_MAX_SPEED = 7;
-const GUN_LEN = 10;           // visual length of gun barrel
+const GUN_LEN = 10;
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let player, ai, ball, bullets, state, serveDir;
@@ -59,14 +59,9 @@ function newPaddle(y, isTop) {
     h: PADDLE_H,
     score: 0,
     isTop,
-    // Shield: array of { start, end } arcs in radians that are INTACT.
-    // For bottom paddle the shield arcs from π to 2π (semicircle above).
-    // For top paddle the shield arcs from 0 to π (semicircle below).
     shieldArcs: isTop
       ? [{ start: 0, end: Math.PI }]
       : [{ start: Math.PI, end: Math.PI * 2 }],
-    // Paddle holes: array of { pos, width } where pos is x-offset from paddle
-    // left edge
     holes: [],
   };
 }
@@ -74,7 +69,6 @@ function newPaddle(y, isTop) {
 function resetRound() {
   player = newPaddle(COURT_H - 40, false);
   ai = newPaddle(40, true);
-  // preserve scores
   if (arguments.length === 2) {
     player.score = arguments[0];
     ai.score = arguments[1];
@@ -84,7 +78,7 @@ function resetRound() {
 }
 
 function serveBall() {
-  const angle = (Math.random() * 0.8 + 0.1) * Math.PI; // 0.1π–0.9π
+  const angle = (Math.random() * 0.8 + 0.1) * Math.PI;
   const spd = BALL_START_SPEED;
   ball = {
     x: COURT_W / 2,
@@ -96,7 +90,7 @@ function serveBall() {
 }
 
 function initGame() {
-  serveDir = -1; // serve toward AI first
+  serveDir = -1;
   state = 'playing';
   resetRound();
 }
@@ -131,7 +125,6 @@ canvas.addEventListener('touchmove', e => {
       const dx = (cx - lastTouchX) / m.scale;
       const dy = (cy - lastTouchY) / m.scale;
       player.x = Math.max(PADDLE_W / 2, Math.min(COURT_W - PADDLE_W / 2, player.x + dx));
-      // Optionally allow slight vertical movement (clamped)
       lastTouchX = cx;
       lastTouchY = cy;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) touchMoved = true;
@@ -143,7 +136,6 @@ canvas.addEventListener('touchend', e => {
   e.preventDefault();
   for (const t of e.changedTouches) {
     if (t.identifier === touchId) {
-      // Tap (no significant drag) → shoot
       if (!touchMoved && state === 'playing') {
         shootBullet(player);
       }
@@ -164,31 +156,25 @@ function shootBullet(paddle) {
   });
 }
 
-// AI shooting cooldown
 let aiShootTimer = 0;
-const AI_SHOOT_INTERVAL = 90; // frames
+const AI_SHOOT_INTERVAL = 90;
 
 // ── Shield hole logic ──────────────────────────────────────────────────────────
-// Remove an angular slice from the shield arcs.
 function punchShieldHole(paddle, angle, halfWidth) {
   const lo = angle - halfWidth;
   const hi = angle + halfWidth;
   const newArcs = [];
   for (const arc of paddle.shieldArcs) {
-    // No overlap
     if (hi <= arc.start || lo >= arc.end) {
       newArcs.push(arc);
       continue;
     }
-    // Left remainder
     if (lo > arc.start) newArcs.push({ start: arc.start, end: lo });
-    // Right remainder
     if (hi < arc.end) newArcs.push({ start: hi, end: arc.end });
   }
   paddle.shieldArcs = newArcs;
 }
 
-// Check if an angle is blocked by shield arcs.
 function shieldBlocksAngle(paddle, angle) {
   for (const arc of paddle.shieldArcs) {
     if (angle >= arc.start && angle <= arc.end) return true;
@@ -199,7 +185,6 @@ function shieldBlocksAngle(paddle, angle) {
 // ── Paddle hole logic ──────────────────────────────────────────────────────────
 function punchPaddleHole(paddle, xHit, width) {
   paddle.holes.push({ pos: xHit - paddle.x + paddle.w / 2, width });
-  // merge overlapping
   paddle.holes.sort((a, b) => a.pos - b.pos);
 }
 
@@ -223,14 +208,12 @@ function circleRectOverlap(cx, cy, r, rx, ry, rw, rh) {
 function update() {
   if (state !== 'playing') return;
 
-  // ── AI movement ──────────────────────────────────────────────────────────────
   const target = ball.vy < 0 ? ball.x : COURT_W / 2;
   const diff = target - ai.x;
   if (Math.abs(diff) > AI_SPEED) ai.x += Math.sign(diff) * AI_SPEED;
   else ai.x = target;
   ai.x = Math.max(PADDLE_W / 2, Math.min(COURT_W - PADDLE_W / 2, ai.x));
 
-  // AI shoot
   aiShootTimer++;
   if (aiShootTimer >= AI_SHOOT_INTERVAL) {
     aiShootTimer = 0;
@@ -242,16 +225,13 @@ function update() {
     const b = bullets[i];
     const prevY = b.y;
     b.y += b.vy;
-    // Off screen
     if (b.y < -20 || b.y > COURT_H + 20) { bullets.splice(i, 1); continue; }
 
-    // Check collision with the *opponent's* shield then paddle
     const target = b.owner === player ? ai : player;
     const dx = b.x - target.x;
     const dy = b.y - target.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Swept shield collision — check if bullet crossed the shield radius
     const prevDy = prevY - target.y;
     const prevDist = Math.sqrt(dx * dx + prevDy * prevDy);
     const crossedShield = (prevDist >= SHIELD_R && dist <= SHIELD_R) ||
@@ -259,7 +239,6 @@ function update() {
                           (dist <= SHIELD_R + BULLET_R && dist >= SHIELD_R - BULLET_R - 2);
 
     if (crossedShield) {
-      // Find the y where bullet crosses shield radius for accurate angle
       const hitY = (prevDist >= SHIELD_R) ? target.y + Math.sign(dy) * Math.sqrt(SHIELD_R * SHIELD_R - dx * dx) : b.y;
       const hitDy = (isNaN(hitY) ? dy : hitY - target.y);
       const angle = Math.atan2(hitDy, dx);
@@ -272,7 +251,6 @@ function update() {
       }
     }
 
-    // Paddle collision
     const px = target.x - target.w / 2;
     const py = target.y - target.h / 2;
     if (b.x >= px && b.x <= px + target.w &&
@@ -287,10 +265,11 @@ function update() {
     const bdy = b.y - ball.y;
     const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
     if (bDist <= BALL_R + BULLET_R) {
-      // Push ball in bullet's direction
-      const pushStrength = 1.5;
-      ball.vx += (bdx / bDist) * pushStrength * 0.3;
-      ball.vy += b.vy > 0 ? pushStrength : -pushStrength;
+      // Strong push: reverse vertical direction and add lateral kick
+      const pushY = b.vy > 0 ? 4 : -4;
+      const pushX = (bdx / (bDist || 1)) * 2.5;
+      ball.vx += pushX;
+      ball.vy = pushY + ball.vy * 0.3; // mostly override vy with bullet direction
       // Clamp ball speed
       const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
       if (spd > BALL_MAX_SPEED) {
@@ -307,7 +286,6 @@ function update() {
   ball.x += ball.vx;
   ball.y += ball.vy;
 
-  // Wall bounce
   if (ball.x - BALL_R <= 0) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); }
   if (ball.x + BALL_R >= COURT_W) { ball.x = COURT_W - BALL_R; ball.vx = -Math.abs(ball.vx); }
 
@@ -320,14 +298,11 @@ function update() {
       const angle = Math.atan2(dy, dx);
       const normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
       if (shieldBlocksAngle(paddle, normAngle)) {
-        // Bounce off shield
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
-        // Only bounce if moving toward shield centre (inward)
         if (dot < 0) {
           ball.vx -= 2 * dot * nx;
           ball.vy -= 2 * dot * ny;
-          // push ball out
           ball.x = paddle.x + nx * (SHIELD_R + BALL_R + 1);
           ball.y = paddle.y + ny * (SHIELD_R + BALL_R + 1);
         }
@@ -340,10 +315,9 @@ function update() {
     const px = paddle.x - paddle.w / 2;
     const py = paddle.y - paddle.h / 2;
     if (circleRectOverlap(ball.x, ball.y, BALL_R, px, py, paddle.w, paddle.h)) {
-      if (!paddleBlocksBall(paddle, ball.x)) continue; // slips through hole
-      // Bounce
-      const relX = (ball.x - paddle.x) / (paddle.w / 2); // -1 to 1
-      const angle = relX * (Math.PI / 3); // max 60° deflection
+      if (!paddleBlocksBall(paddle, ball.x)) continue;
+      const relX = (ball.x - paddle.x) / (paddle.w / 2);
+      const angle = relX * (Math.PI / 3);
       ball.speed = Math.min(ball.speed + 0.15, BALL_MAX_SPEED);
       const dir = paddle.isTop ? 1 : -1;
       ball.vx = Math.sin(angle) * ball.speed;
@@ -352,7 +326,6 @@ function update() {
     }
   }
 
-  // ── Scoring ──────────────────────────────────────────────────────────────────
   if (ball.y - BALL_R <= 0) {
     player.score++;
     afterPoint();
@@ -377,11 +350,9 @@ function draw() {
   const m = courtMetrics();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Court background
   ctx.fillStyle = '#111';
   ctx.fillRect(m.ox, m.oy, m.w, m.h);
 
-  // Centre line
   ctx.strokeStyle = '#333';
   ctx.lineWidth = 1 * m.scale;
   ctx.setLineDash([6 * m.scale, 6 * m.scale]);
@@ -393,7 +364,6 @@ function draw() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Scores
   ctx.fillStyle = '#555';
   ctx.font = `bold ${32 * m.scale}px monospace`;
   ctx.textAlign = 'center';
@@ -402,14 +372,12 @@ function draw() {
   ctx.fillText(ai.score, sx, sy1);
   ctx.fillText(player.score, sx, sy2);
 
-  // Draw paddles, shields, guns
   for (const paddle of [player, ai]) {
     const [px, py] = toCanvas(paddle.x - paddle.w / 2, paddle.y - paddle.h / 2);
     const pw = paddle.w * m.scale;
     const ph = paddle.h * m.scale;
     const [cx, cy] = toCanvas(paddle.x, paddle.y);
 
-    // Shield arcs
     ctx.strokeStyle = '#0ff';
     ctx.lineWidth = 2 * m.scale;
     const sr = SHIELD_R * m.scale;
@@ -419,9 +387,7 @@ function draw() {
       ctx.stroke();
     }
 
-    // Paddle (with holes visualised as gaps)
     ctx.fillStyle = '#fff';
-    // Draw paddle as segments between holes
     const sortedHoles = [...paddle.holes].sort((a, b) => a.pos - b.pos);
     let drawStart = 0;
     for (const hole of sortedHoles) {
@@ -438,7 +404,6 @@ function draw() {
       ctx.fillRect(sx2, sy, (paddle.w - drawStart) * m.scale, ph);
     }
 
-    // Gun barrel
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 2 * m.scale;
     ctx.beginPath();
@@ -450,7 +415,6 @@ function draw() {
     ctx.stroke();
   }
 
-  // Bullets
   ctx.fillStyle = '#ff0';
   for (const b of bullets) {
     const [bx, by] = toCanvas(b.x, b.y);
@@ -459,14 +423,12 @@ function draw() {
     ctx.fill();
   }
 
-  // Ball
   ctx.fillStyle = '#fff';
   const [bx, by] = toCanvas(ball.x, ball.y);
   ctx.beginPath();
   ctx.arc(bx, by, BALL_R * m.scale, 0, Math.PI * 2);
   ctx.fill();
 
-  // Game over overlay
   if (state === 'gameover') {
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(m.ox, m.oy, m.w, m.h);
