@@ -12,8 +12,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Coordinate helpers – everything is stored in "game units" where the court is
-// 400 wide × 700 tall, centred on the canvas.
 function courtMetrics() {
   const cw = canvas.width, ch = canvas.height;
   const aspect = 400 / 700;
@@ -189,9 +187,12 @@ function punchPaddleHole(paddle, xHit, width) {
 }
 
 function paddleBlocksBall(paddle, bx) {
+  // Ball passes through only if its full diameter fits inside a hole
   const rel = bx - (paddle.x - paddle.w / 2);
   for (const h of paddle.holes) {
-    if (rel >= h.pos - h.width / 2 && rel <= h.pos + h.width / 2) return false;
+    const holeLeft = h.pos - h.width / 2;
+    const holeRight = h.pos + h.width / 2;
+    if (rel - BALL_R >= holeLeft && rel + BALL_R <= holeRight) return false;
   }
   return true;
 }
@@ -265,12 +266,10 @@ function update() {
     const bdy = b.y - ball.y;
     const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
     if (bDist <= BALL_R + BULLET_R) {
-      // Strong push: reverse vertical direction and add lateral kick
       const pushY = b.vy > 0 ? 4 : -4;
       const pushX = (bdx / (bDist || 1)) * 2.5;
       ball.vx += pushX;
-      ball.vy = pushY + ball.vy * 0.3; // mostly override vy with bullet direction
-      // Clamp ball speed
+      ball.vy = pushY + ball.vy * 0.3;
       const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
       if (spd > BALL_MAX_SPEED) {
         ball.vx = (ball.vx / spd) * BALL_MAX_SPEED;
@@ -297,7 +296,12 @@ function update() {
     if (dist >= SHIELD_R - BALL_R && dist <= SHIELD_R + BALL_R) {
       const angle = Math.atan2(dy, dx);
       const normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
-      if (shieldBlocksAngle(paddle, normAngle)) {
+      // Check angular span of the ball, not just center
+      const halfArc = Math.atan2(BALL_R, SHIELD_R);
+      const blocked = shieldBlocksAngle(paddle, normAngle) ||
+                      shieldBlocksAngle(paddle, normAngle - halfArc) ||
+                      shieldBlocksAngle(paddle, normAngle + halfArc);
+      if (blocked) {
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
         if (dot < 0) {
