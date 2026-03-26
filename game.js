@@ -38,7 +38,7 @@ const COURT_W = 400;
 const COURT_H = 700;
 const PADDLE_W = 60;
 const PADDLE_H = 10;
-const BALL_R = 5;
+const BALL_R = 7.5;
 const SHIELD_R = 50;          // semicircle radius around paddle centre
 const BULLET_R = 2;           // bullet half-width (creates 4px holes)
 const BULLET_SPEED = 8;       // game-units per frame
@@ -278,6 +278,26 @@ function update() {
     if (b.x >= px && b.x <= px + target.w &&
         b.y >= py && b.y <= py + target.h) {
       punchPaddleHole(target, b.x, BULLET_R * 2);
+      bullets.splice(i, 1);
+      continue;
+    }
+
+    // Bullet-ball collision — deflect ball on impact
+    const bdx = b.x - ball.x;
+    const bdy = b.y - ball.y;
+    const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
+    if (bDist <= BALL_R + BULLET_R) {
+      // Push ball in bullet's direction
+      const pushStrength = 1.5;
+      ball.vx += (bdx / bDist) * pushStrength * 0.3;
+      ball.vy += b.vy > 0 ? pushStrength : -pushStrength;
+      // Clamp ball speed
+      const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      if (spd > BALL_MAX_SPEED) {
+        ball.vx = (ball.vx / spd) * BALL_MAX_SPEED;
+        ball.vy = (ball.vy / spd) * BALL_MAX_SPEED;
+      }
+      ball.speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
       bullets.splice(i, 1);
       continue;
     }
