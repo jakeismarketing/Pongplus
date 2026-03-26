@@ -287,10 +287,11 @@ function update() {
     const bdy = b.y - ball.y;
     const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
     if (bDist <= BALL_R + BULLET_R) {
-      // Push ball in bullet's direction
-      const pushStrength = 1.5;
-      ball.vx += (bdx / bDist) * pushStrength * 0.3;
-      ball.vy += b.vy > 0 ? pushStrength : -pushStrength;
+      // Strong push: reverse vertical direction and add lateral kick
+      const pushY = b.vy > 0 ? 4 : -4;
+      const pushX = (bdx / (bDist || 1)) * 2.5;
+      ball.vx += pushX;
+      ball.vy = pushY + ball.vy * 0.3; // mostly override vy with bullet direction
       // Clamp ball speed
       const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
       if (spd > BALL_MAX_SPEED) {
