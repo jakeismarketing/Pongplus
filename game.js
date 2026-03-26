@@ -204,9 +204,12 @@ function punchPaddleHole(paddle, xHit, width) {
 }
 
 function paddleBlocksBall(paddle, bx) {
+  // Ball passes through only if its full diameter fits inside a hole
   const rel = bx - (paddle.x - paddle.w / 2);
   for (const h of paddle.holes) {
-    if (rel >= h.pos - h.width / 2 && rel <= h.pos + h.width / 2) return false;
+    const holeLeft = h.pos - h.width / 2;
+    const holeRight = h.pos + h.width / 2;
+    if (rel - BALL_R >= holeLeft && rel + BALL_R <= holeRight) return false;
   }
   return true;
 }
@@ -320,7 +323,12 @@ function update() {
     if (dist >= SHIELD_R - BALL_R && dist <= SHIELD_R + BALL_R) {
       const angle = Math.atan2(dy, dx);
       const normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
-      if (shieldBlocksAngle(paddle, normAngle)) {
+      // Check angular span of the ball, not just center
+      const halfArc = Math.atan2(BALL_R, SHIELD_R);
+      const blocked = shieldBlocksAngle(paddle, normAngle) ||
+                      shieldBlocksAngle(paddle, normAngle - halfArc) ||
+                      shieldBlocksAngle(paddle, normAngle + halfArc);
+      if (blocked) {
         // Bounce off shield
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
